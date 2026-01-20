@@ -49,7 +49,7 @@ UPDATE_ORDER_STATUS = """
 # =============== FLOWERS ===============
 
 GET_ALL_FLOWERS = """
-    SELECT id, name, color, current_stock, price 
+    SELECT id, name, color, current_stock, unit_price
     FROM flower 
     ORDER BY name
 """
@@ -80,13 +80,21 @@ GET_AVAILABLE_STOCK = """
     FROM flower f
 """
 
+# WARNING: Deprectated
 UPDATE_STOCK_DEDUCT = """
     UPDATE flower 
     SET current_stock = current_stock - ? 
     WHERE id = ?
 """
 
+# WARNING: Deprectated
 UPDATE_STOCK_ADD = """
+    UPDATE flower 
+    SET current_stock = current_stock + ? 
+    WHERE id = ?
+"""
+
+UPDATE_STOCK = """
     UPDATE flower 
     SET current_stock = current_stock + ? 
     WHERE id = ?
@@ -99,12 +107,38 @@ INSERT_STOCK_MOVEMENT = """
     VALUES (?, ?, ?, ?, ?, ?)
 """
 
+
 GET_STOCK_MOVEMENTS = """
     SELECT id, flower_id, movement_type, quantity, movement_date, reference_id, reference_type, notes
     FROM stock_movement
     WHERE flower_id = ?
     ORDER BY movement_date DESC
     LIMIT ?
+"""
+
+GET_STOCK_HISTORY = """
+    WITH MovimientosDiarios AS (
+        SELECT
+            flower_id,
+            DATE(created_at) as fecha,
+            SUM(CASE
+                WHEN movement_type IN ('IN', 'ENTRADA') THEN quantity
+                WHEN movement_type IN ('OUT', 'SALIDA') THEN -quantity
+                ELSE 0
+            END) as cambio_diario
+        FROM stock_movement
+        GROUP BY flower_id, DATE(created_at)
+    )
+    SELECT
+        f.name,
+        md.fecha,
+        SUM(md.cambio_diario) OVER (
+            PARTITION BY md.flower_id
+            ORDER BY md.fecha
+        ) as stock_al_cierre
+    FROM MovimientosDiarios md
+    JOIN flowers f ON md.flower_id = f.id
+    ORDER BY f.name, md.fecha;
 """
 
 # =============== CUSTOMERS ===============
