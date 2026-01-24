@@ -1,3 +1,4 @@
+from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import logging
@@ -8,6 +9,8 @@ from backend import (
     _get_all_flowers,
     _get_all_occasions,
     _get_order_items,
+    _get_all_movements,
+    create_inventory_transaction,
     create_order_transaction,
 )
 
@@ -36,6 +39,14 @@ class CreateOrderRequest(BaseModel):
     customer_id: int
     occasion_id: int
     items: list[OrderItem]
+    notes: str = ""
+
+
+class OrderMovement(BaseModel):
+    items: list[OrderItem]
+    movement_type: Literal["in", "out"]
+    reference_id: int | None
+    reference_type: Literal["purchase", "adjustment", "waste"]
     notes: str = ""
 
 
@@ -153,6 +164,50 @@ def get_all_flowers():
             "color": row[2],
             "current_stock": row[3],
             "price": row[4],
+        }
+        for row in rows
+    ]
+
+
+@app.post("/flowers/movements")
+def create_stock_movement(movement: OrderMovement):
+    try:
+        items_dict = [
+            {
+                "flower_id": item.flower_id,
+                "quantity": item.quantity,
+            }
+            for item in movement.items
+        ]
+        create_inventory_transaction(
+            items=items_dict,
+            movement_type=movement.movement_type,
+            reference_id=movement.reference_id,
+            reference_type=movement.reference_type,
+            notes=movement.notes,
+        )
+        return {"message": "Movimiento creado exitosamente"}
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creando movimiento: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/flowers/movements/history")
+def get_all_movements(limit: int = 10):
+    rows = _get_all_movements(limit)
+    return [
+        {
+            "id": row[0],
+            "flower_id": row[1],
+            "movement_type": row[2],
+            "quantity": row[3],
+            "reference_type": row[4],
+            "reference_id": row[5],
+            "notes": row[6],
+            "created_at": row[7],
         }
         for row in rows
     ]

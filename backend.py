@@ -3,6 +3,7 @@ Backend module for database
 """
 
 import os
+from typing import Literal
 import libsql
 from dotenv import load_dotenv
 import logging
@@ -126,6 +127,10 @@ def _get_stock_history():
     return query(sql.GET_STOCK_HISTORY)
 
 
+def _get_all_movements(limit: int = 10):
+    return query(sql.GET_STOCK_MOVEMENTS, (limit,))
+
+
 # Others
 
 
@@ -207,11 +212,11 @@ def create_order_transaction(
                     sql.INSERT_STOCK_MOVEMENT,
                     (
                         item["flower_id"],
-                        "sale",
+                        "out",
                         item["quantity"],
                         order_id,
-                        "sale_order",
-                        f"Stock reservado para orden #{order_id}",
+                        "sale",
+                        f"Reservado orden #{order_id}",
                     ),
                 )
 
@@ -230,23 +235,17 @@ def fulfill_order_transaction(order_id: int):
                 (order_id,),
             ).fetchall()
 
-            # sql_audit = """
-            #     INSERT INTO stock_movement (flower_id, movement_type, quantity, reference_id, reference_type, notes)
-            #     VALUES (?, 'sale', ?, ?, 'sale_order', ?)
-            # """
-
         for flower_id, quantity in items:
             conn.execute(sql.UPDATE_STOCK, (quantity, flower_id))
-            # WARNING: Ya se realiza un INSERT en el stock_movement al momento de crear la orden;
-            # es mejor usar UPDATE para actualizar el movimiento en lugar de agregar otro (duplicado)
             conn.execute(
-                sql.INSERT_STOCK_MOVEMENT,
+                """
+                UPDATE stock_movement 
+                SET notes = Vendido en ramo # ?
+                WHERE flower_id = ?
+            """,
                 (
-                    flower_id,
-                    "sale",
-                    quantity,
                     order_id,
-                    f"Orden #{order_id} despachada",
+                    flower_id,
                 ),
             )
 
@@ -264,52 +263,40 @@ def fulfill_order_transaction(order_id: int):
 
 def create_inventory_transaction(
     items: list[dict],
-    movement_type: str,
+    movement_type: Literal["in", "out"],
     reference_id: int | None = None,
-    note: str | None = None,
+    reference_type: Literal["purchase", "adjustment", "waste"] = "adjustment",
+    notes: str | None = None,
 ):
     """
     items: [{"flower_id": int, "quantity": int}, ...]
-    quantity: ALWAYS positive unleast if its "adjustment"
     """
+
+    if movement_type == "in":
+        update_stock_query = sql.UPDATE_STOCK_ADD
+    elif movement_type == "out":
+        update_stock_query = sql.UPDATE_STOCK_DEDUCT
+
     with get_connection() as conn:
         with transaction(conn):
             for item in items:
                 flower_id = item["flower_id"]
-                quantity = abs(item["quantity"])  # Force positive
-
-                # Determinar operación según tipo
-                if movement_type == "purchase":
-                    stock_delta = quantity
-                    ref_type = "purchase_order"
-                    note = note or f"Compra #{reference_id}"
-                elif movement_type == "waste":
-                    stock_delta = -quantity
-                    ref_type = None
-                    note = note or "Merma de inventario"
-                elif movement_type == "adjustment":
-                    # adjustment usa el signo original de quantity
-                    stock_delta = item["quantity"]
-                    ref_type = "inventory_count"
-                    note = note or "Ajuste manual"
-                else:
-                    raise
-
+                quantity = item["quantity"]
                 # Insertar movimiento
                 conn.execute(
                     sql.INSERT_STOCK_MOVEMENT,
                     (
                         flower_id,
                         movement_type,
-                        stock_delta,
+                        quantity,
                         reference_id,
-                        ref_type,
-                        note,
+                        reference_type,
+                        notes,
                     ),
                 )
 
                 # Actualizar stock
                 conn.execute(
-                    sql.UPDATE_STOCK,
-                    (stock_delta, flower_id),
+                    update_stock_query,
+                    (quantity, flower_id),
                 )

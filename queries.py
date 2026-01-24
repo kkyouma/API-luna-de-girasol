@@ -32,7 +32,7 @@ GET_ORDER_ITEMS = """
 
 INSERT_ORDER = """
     INSERT INTO sale_order (customer_id, occasion_id, order_date, subtotal, total, status, notes)
-    VALUES (?, ?, DATE('now'), ?, ?, 'pending', ?)
+    VALUES (?, ?, DATETIME('now'), ?, ?, 'pending', ?)
 """
 
 INSERT_ORDER_ITEM = """
@@ -80,21 +80,13 @@ GET_AVAILABLE_STOCK = """
     FROM flower f
 """
 
-# WARNING: Deprectated
 UPDATE_STOCK_DEDUCT = """
     UPDATE flower 
     SET current_stock = current_stock - ? 
     WHERE id = ?
 """
 
-# WARNING: Deprectated
 UPDATE_STOCK_ADD = """
-    UPDATE flower 
-    SET current_stock = current_stock + ? 
-    WHERE id = ?
-"""
-
-UPDATE_STOCK = """
     UPDATE flower 
     SET current_stock = current_stock + ? 
     WHERE id = ?
@@ -109,10 +101,9 @@ INSERT_STOCK_MOVEMENT = """
 
 
 GET_STOCK_MOVEMENTS = """
-    SELECT id, flower_id, movement_type, quantity, movement_date, reference_id, reference_type, notes
+    SELECT id, flower_id, movement_type, quantity, reference_type, reference_id, notes, created_at
     FROM stock_movement
-    WHERE flower_id = ?
-    ORDER BY movement_date DESC
+    ORDER BY created_at DESC
     LIMIT ?
 """
 
@@ -122,8 +113,8 @@ GET_STOCK_HISTORY = """
             flower_id,
             DATE(created_at) as fecha,
             SUM(CASE
-                WHEN movement_type IN ('IN', 'ENTRADA') THEN quantity
-                WHEN movement_type IN ('OUT', 'SALIDA') THEN -quantity
+                WHEN movement_type IN ('in') THEN quantity
+                WHEN movement_type IN ('out') THEN -quantity
                 ELSE 0
             END) as cambio_diario
         FROM stock_movement
