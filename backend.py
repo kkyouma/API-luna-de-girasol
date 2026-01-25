@@ -272,10 +272,22 @@ def create_inventory_transaction(
     items: [{"flower_id": int, "quantity": int}, ...]
     """
 
+    expected_direction = {
+        "purchase": "in",
+        "waste": "out",
+        "adjustment": movement_type,
+    }
+
+    if movement_type != expected_direction[reference_type]:
+        raise ValueError(
+            f"{reference_type} movement must be '{expected_direction[reference_type]}'"
+        )
+
+    # Change query according to movement type
     if movement_type == "in":
-        update_stock_query = sql.UPDATE_STOCK_ADD
+        update_stock_sql = sql.UPDATE_STOCK_ADD
     elif movement_type == "out":
-        update_stock_query = sql.UPDATE_STOCK_DEDUCT
+        update_stock_sql = sql.UPDATE_STOCK_DEDUCT
 
     with get_connection() as conn:
         with transaction(conn):
@@ -297,6 +309,6 @@ def create_inventory_transaction(
 
                 # Actualizar stock
                 conn.execute(
-                    update_stock_query,
+                    update_stock_sql,
                     (quantity, flower_id),
                 )
