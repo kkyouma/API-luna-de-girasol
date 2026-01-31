@@ -7,6 +7,7 @@ wheels/
 *.egg-info
 *.db
 .streamlit/secrets.toml
+schema.sql
 
 # Virtual environments
 .venv
