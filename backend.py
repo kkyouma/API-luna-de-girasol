@@ -140,6 +140,60 @@ def _get_all_occasions():
 # =============== BUSINESS FUNCTIONS ===============
 
 
+# TODO: habilitar reestock rapido (POST /inventory/quick-restock)
+def create_inventory_transaction(
+    items: list[dict],
+    movement_type: Literal["in", "out"],
+    reference_id: int | None = None,
+    reference_type: Literal["purchase", "adjustment", "waste"] = "adjustment",
+    notes: str | None = None,
+):
+    """Crea un movimiento de stock y actualiza el stock.
+
+    Args:
+        items ([{"flower_id": int, "quantity": int}, ...])
+    """
+    expected_direction = {
+        "purchase": "in",
+        "waste": "out",
+        "adjustment": movement_type,
+    }
+
+    if movement_type != expected_direction[reference_type]:
+        raise ValueError(
+            f"{reference_type} movement must be '{expected_direction[reference_type]}'",
+        )
+
+    # Change query according to movement type
+    if movement_type == "in":
+        update_stock_sql = sql.UPDATE_STOCK_ADD
+    elif movement_type == "out":
+        update_stock_sql = sql.UPDATE_STOCK_DEDUCT
+
+    with get_connection() as conn, transaction(conn):
+        for item in items:
+            flower_id = item["flower_id"]
+            quantity = item["quantity"]
+            # Insertar movimiento
+            conn.execute(
+                sql.INSERT_STOCK_MOVEMENT,
+                (
+                    flower_id,
+                    movement_type,
+                    quantity,
+                    reference_id,
+                    reference_type,
+                    notes,
+                ),
+            )
+
+            # Actualizar stock
+            conn.execute(
+                update_stock_sql,
+                (quantity, flower_id),
+            )
+
+
 # NOTE: Verificar query con y sin placeholders
 def get_available_stock(
     flower_ids: list[int] | None,
@@ -261,56 +315,3 @@ def fulfill_order_transaction(order_id: int):
 
         conn.commit()
         return True
-
-
-def create_inventory_transaction(
-    items: list[dict],
-    movement_type: Literal["in", "out"],
-    reference_id: int | None = None,
-    reference_type: Literal["purchase", "adjustment", "waste"] = "adjustment",
-    notes: str | None = None,
-):
-    """Crea un movimiento de stock y actualiza el stock.
-
-    Args:
-        items ([{"flower_id": int, "quantity": int}, ...])
-    """
-    expected_direction = {
-        "purchase": "in",
-        "waste": "out",
-        "adjustment": movement_type,
-    }
-
-    if movement_type != expected_direction[reference_type]:
-        raise ValueError(
-            f"{reference_type} movement must be '{expected_direction[reference_type]}'",
-        )
-
-    # Change query according to movement type
-    if movement_type == "in":
-        update_stock_sql = sql.UPDATE_STOCK_ADD
-    elif movement_type == "out":
-        update_stock_sql = sql.UPDATE_STOCK_DEDUCT
-
-    with get_connection() as conn, transaction(conn):
-        for item in items:
-            flower_id = item["flower_id"]
-            quantity = item["quantity"]
-            # Insertar movimiento
-            conn.execute(
-                sql.INSERT_STOCK_MOVEMENT,
-                (
-                    flower_id,
-                    movement_type,
-                    quantity,
-                    reference_id,
-                    reference_type,
-                    notes,
-                ),
-            )
-
-            # Actualizar stock
-            conn.execute(
-                update_stock_sql,
-                (quantity, flower_id),
-            )
