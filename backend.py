@@ -1,14 +1,13 @@
-"""
-Backend module for database
-"""
+"""Backend module for database."""
 
-import os
-from typing import Literal
-import libsql
-from dotenv import load_dotenv
 import logging
+import os
 from contextlib import contextmanager
+from typing import Literal
+
+import libsql
 import queries as sql
+from dotenv import load_dotenv
 
 # =============== CONFIG ===============
 # pyright: reportAttributeAccessIssue=false
@@ -28,32 +27,32 @@ if not _url or not _token:
 
 # =============== CONECTION MANAGER ===============
 @contextmanager
-def get_connection():
+def get_connection():  # noqa: ANN201
     conn = None
     try:
-        conn = libsql.connect(_url, auth_token=_token)
+        conn = libsql.connect(_url, auth_token=_token)  # ty:ignore[unresolved-attribute]
         yield conn
-    except Exception as e:
-        logger.error(f"Connection error: {e}")
+    except Exception:
+        logger.exception("Connection error")
         raise
     finally:
         if conn:
             try:
                 conn.close()
-            except Exception as e:
-                logger.error(f"Error at closing the connection: {e}")
+            except Exception:
+                logger.exception("Error at closing the connection")
 
 
 @contextmanager
-def transaction(conn: libsql.Connection):
+def transaction(conn: libsql.Connection):  # ty:ignore[unresolved-attribute]
     try:
         conn.execute("BEGIN")
         yield conn
         conn.commit()
         logger.debug("Completed transaction successfully")
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        logger.error(f"Transaction reverted: {e}")
+        logger.exception("Transaction reverted")
         raise
 
 
@@ -86,9 +85,9 @@ def execute(sql: str, params: tuple = ()) -> int:
             lastrowid = cursor.lastrowid
             cursor.close()
             return lastrowid
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            logger.error(f"Execute failed: {e}")
+            logger.exception("Execute failed")
             raise
 
 
@@ -143,9 +142,11 @@ def _get_all_occasions():
 
 # NOTE: Verificar query con y sin placeholders
 def get_available_stock(
-    flower_ids: list[int] | None, conn: libsql.Connection
+    flower_ids: list[int] | None,
+    conn: libsql.Connection,  # ty:ignore[unresolved-attribute]
 ) -> dict[int, int]:
-    """
+    """Obtiene el stock disponible de las flores indicadas.
+
     Return: {flower_id: available_stock}
 
     Args:
@@ -189,7 +190,8 @@ def create_order_transaction(
             subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
             total = subtotal
             cursor = conn.execute(
-                sql.INSERT_ORDER, (customer_id, occasion_id, subtotal, total, notes)
+                sql.INSERT_ORDER,
+                (customer_id, occasion_id, subtotal, total, notes),
             )
             order_id = cursor.lastrowid
 
@@ -268,10 +270,11 @@ def create_inventory_transaction(
     reference_type: Literal["purchase", "adjustment", "waste"] = "adjustment",
     notes: str | None = None,
 ):
-    """
-    items: [{"flower_id": int, "quantity": int}, ...]
-    """
+    """Crea un movimiento de stock y actualiza el stock.
 
+    Args:
+        items ([{"flower_id": int, "quantity": int}, ...])
+    """
     expected_direction = {
         "purchase": "in",
         "waste": "out",
@@ -280,7 +283,7 @@ def create_inventory_transaction(
 
     if movement_type != expected_direction[reference_type]:
         raise ValueError(
-            f"{reference_type} movement must be '{expected_direction[reference_type]}'"
+            f"{reference_type} movement must be '{expected_direction[reference_type]}'",
         )
 
     # Change query according to movement type
@@ -289,26 +292,25 @@ def create_inventory_transaction(
     elif movement_type == "out":
         update_stock_sql = sql.UPDATE_STOCK_DEDUCT
 
-    with get_connection() as conn:
-        with transaction(conn):
-            for item in items:
-                flower_id = item["flower_id"]
-                quantity = item["quantity"]
-                # Insertar movimiento
-                conn.execute(
-                    sql.INSERT_STOCK_MOVEMENT,
-                    (
-                        flower_id,
-                        movement_type,
-                        quantity,
-                        reference_id,
-                        reference_type,
-                        notes,
-                    ),
-                )
+    with get_connection() as conn, transaction(conn):
+        for item in items:
+            flower_id = item["flower_id"]
+            quantity = item["quantity"]
+            # Insertar movimiento
+            conn.execute(
+                sql.INSERT_STOCK_MOVEMENT,
+                (
+                    flower_id,
+                    movement_type,
+                    quantity,
+                    reference_id,
+                    reference_type,
+                    notes,
+                ),
+            )
 
-                # Actualizar stock
-                conn.execute(
-                    update_stock_sql,
-                    (quantity, flower_id),
-                )
+            # Actualizar stock
+            conn.execute(
+                update_stock_sql,
+                (quantity, flower_id),
+            )

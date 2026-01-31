@@ -1,6 +1,4 @@
-"""
-Centralized SQL queries for the florist database
-"""
+"""Centralized SQL queries for the florist database."""
 
 # =============== ORDERS ===============
 

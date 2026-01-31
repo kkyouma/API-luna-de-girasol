@@ -62,6 +62,7 @@ ignore = [
   "ANN001", # Missing type annotation for function argument
   "ANN002", # Missing type annotation for *args
   "ANN003", # Missing type annotation for **kwargs
+  "TRY003",
 ]
 
 fixable = [
