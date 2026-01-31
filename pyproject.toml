@@ -5,9 +5,84 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.128.0",
-    "libsql>=0.1.11",
-    "pydantic>=2.12.5",
-    "python-dotenv>=1.2.1",
-    "uvicorn>=0.40.0",
+  "fastapi>=0.128.0",
+  "libsql>=0.1.11",
+  "pydantic>=2.12.5",
+  "python-dotenv>=1.2.1",
+  "uvicorn>=0.40.0",
 ]
+
+[tool.ruff]
+line-length = 88
+src = ["src"] # Source code
+exclude = [
+  ".venv",
+  ".mypy_cache",
+  ".ruff_cache",
+  "**/.cache",
+  "build",
+  "dist",
+  ".git",
+] # Common exclusions
+
+select = [
+  "E",    # PEP 8 errors
+  "F",    # Pyflakes
+  "I",    # isort
+  "UP",   # pyupgrade
+  "D",    # pydocstyle
+  "ANN",  # flake8-annotations
+  "S",    # flake8-simplify
+  "BLE",  # flake8-blake3
+  "A",    # flake8-builtins
+  "ARG",  # flake8-argparse
+  "C4",   # flake8-comprehensions
+  "PL",   # pylint (a subset)
+  "TRY",  # tryceratops
+  "SLF",  # flake8-self
+  "SIM",  # flake8-simplify
+  "FURB", # refurb
+  "RUF",  # Ruff-specific rules
+  "N",    # pep8-naming
+  "COM",  # flake8-commas
+  "PERF", # Perflint
+]
+
+# select = ["ALL"]
+
+ignore = [
+  "E501",   # Line too long (if you have a higher line-length and want to allow it)
+  "D100",   # Missing docstring (if you're not strict about docstrings)
+  "D101",   # Missing docstring in public class
+  "D102",   # Missing docstring in public method
+  "D103",   # Missing docstring in public function
+  "D104",   # Missing docstring in public package
+  "D105",   # Missing docstring in public module
+  "D400",   # First line should end with a period
+  "ANN001", # Missing type annotation for function argument
+  "ANN002", # Missing type annotation for *args
+  "ANN003", # Missing type annotation for **kwargs
+]
+
+fixable = [
+  "E",
+  "F",
+  "I",
+  "UP",
+  "RUF",
+  "SIM",
+] # Add more as you become comfortable
+
+# Rule-specific settings (example)
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.ruff.flake8-quotes]
+inline-quotes = "double"
+
+[tool.sqlfluff.rules.capitalisation]
+capitalisation_policy = "lower"
+extended_capitalisation_policy = "lower"
+
+[dependency-groups]
+dev = ["ruff>=0.14.14", "sqlfluff>=4.0.0", "ty>=0.0.14"]
