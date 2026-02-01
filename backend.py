@@ -44,7 +44,7 @@ def get_connection():  # noqa: ANN201
 
 
 @contextmanager
-def transaction(conn: libsql.Connection):  # ty:ignore[unresolved-attribute]
+def transaction(conn: libsql.Connection):  # ty:ignore[unresolved-attribute]  # noqa: ANN201
     try:
         conn.execute("BEGIN")
         yield conn
@@ -68,7 +68,7 @@ def query(sql: str, params: tuple = ()) -> list[tuple]:
         return rows
 
 
-def query_one(sql: str, params: tuple = ()):
+def query_one(sql: str, params: tuple = ()) -> list[tuple]:
     with get_connection() as conn:
         cursor = conn.execute(sql, params)
         rows = cursor.fetchone()
@@ -109,17 +109,22 @@ def _get_order_items(order_id: int):
     return query(sql.GET_ORDER_ITEMS, (order_id,))
 
 
-# Flowers
+# Inventory
 
 
-def _get_flower_stock(flower_id: int) -> int:
-    rows = query(sql.GET_FLOWER_STOCK, (flower_id,))
+def _get_catalog():
+    return query(sql.GET_ALL_CATALOG)
+
+
+# NOTE: Cambiar `category` con Literal["category"...] cuando se sepan
+def _get_flower_stock(category: str) -> int:
+    rows = query(sql.GET_INVENTORY_DETAILS, (category,))
 
     return rows[0][0] if rows else 0
 
 
 def _get_all_flowers():
-    return query(sql.GET_ALL_FLOWERS)
+    return query(sql.GET_ALL_INVENTORY)
 
 
 def _get_stock_history():
@@ -138,6 +143,25 @@ def _get_all_occasions():
 
 
 # =============== BUSINESS FUNCTIONS ===============
+
+
+def modify_catalog(
+    name: str,
+    category: str,
+    description: str | None = "",
+    care_instructions: str | None = "",
+):
+    with get_connection() as conn, transaction(conn):
+        conn.execute(
+            sql.INSERT_CATALOG,
+            (
+                name,
+                category,
+                description,
+                care_instructions,
+            ),
+        )
+        return True
 
 
 # TODO: habilitar reestock rapido (POST /inventory/quick-restock)

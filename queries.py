@@ -44,11 +44,21 @@ UPDATE_ORDER_STATUS = """
     WHERE id = ?
 """
 
-# =============== FLOWERS ===============
+# =============== INVENTORY ===============
+GET_ALL_CATALOG = """
+    SELECT id, name, category, description
+    FROM product_catalog
+    ORDER BY name
+"""
 
-GET_ALL_FLOWERS = """
+INSERT_CATALOG = """
+    INSERT INTO product_catalog (name, category, description, care_instructions)
+    VALUES (?, ?, ?, ?)
+"""
+
+GET_ALL_INVENTORY = """
     SELECT id, name, color, current_stock, unit_price
-    FROM flower 
+    FROM inventory_item 
     ORDER BY name
 """
 
@@ -58,10 +68,10 @@ GET_FLOWER_BY_ID = """
     WHERE id = ?
 """
 
-GET_FLOWER_STOCK = """
-    SELECT current_stock 
-    FROM flower 
-    WHERE id = ?
+GET_INVENTORY_DETAILS = """
+    SELECT iventory_id, product_name, variant_name, category, unit_price, current_stock
+    FROM view_inventory_details 
+    WHERE category = ?
 """
 
 GET_AVAILABLE_STOCK = """
@@ -80,13 +90,13 @@ GET_AVAILABLE_STOCK = """
 
 UPDATE_STOCK_DEDUCT = """
     UPDATE flower 
-    SET current_stock = current_stock - ? 
+    SET inventory_item = inventory_item - ? 
     WHERE id = ?
 """
 
 UPDATE_STOCK_ADD = """
     UPDATE flower 
-    SET current_stock = current_stock + ? 
+    SET inventory_item = inventory_item + ? 
     WHERE id = ?
 """
 
