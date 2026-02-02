@@ -1,20 +1,56 @@
 from datetime import datetime
-from typing import Literal
+from enum import Enum
 
 from sqlmodel import Field, Relationship, SQLModel
+
+# =============== ENUMS (Reemplazo de Literal) ================
+
+
+class PurchaseOrderStatus(str, Enum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+
+
+class SaleOrderType(str, Enum):
+    WALK_IN = "walk-in"
+    ONLINE = "online"
+    PHONE = "phone"
+
+
+class SaleOrderStatus(str, Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class StockMovementType(str, Enum):
+    IN = "in"
+    OUT = "out"
+
+
+class StockReferenceType(str, Enum):
+    PURCHASE = "purchase"
+    SALE = "sale"
+    ADJUSTMENT = "adjustment"
+    WASTE = "waste"
+    PRODUCTION = "production"
+
 
 # =============== MAIN TABLES ================
 
 
 class ProductCatalog(SQLModel, table=True):
-    __tablename = "catalog"
+    __tablename__ = "product_catalog"
 
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(max_length=100, nullable=False)
     category: str = Field(max_length=50, nullable=False)
     description: str | None = Field(default=None, max_length=500)
     care_instructions: str | None = Field(default=None, max_length=500)
-    created_at: datetime | None = Field(default=None)  # Datetime managed by Turso
+    created_at: datetime | None = Field(default=None)
+
+    inventory_items: list["InventoryItem"] = Relationship(back_populates="product")
 
 
 class InventoryItem(SQLModel, table=True):
@@ -65,7 +101,7 @@ class PurchaseOrder(SQLModel, table=True):
     order_date: datetime
     delivery_date: datetime | None = None
     total_cost: float
-    status: Literal["pending", "delivered", "cancelled"] = "pending"
+    status: PurchaseOrderStatus = Field(default=PurchaseOrderStatus.PENDING)
     notes: str | None = None
     created_at: datetime | None = Field(default=None)
 
@@ -144,7 +180,7 @@ class SaleOrder(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     customer_id: int | None = Field(foreign_key="customer.id")
     order_date: datetime
-    order_type: Literal["walk-in", "online", "phone"] = "walk-in"
+    order_type: SaleOrderType = Field(default=SaleOrderType.WALK_IN)
     occasion_id: int | None = Field(foreign_key="occasion.id")
 
     subtotal: float
@@ -153,7 +189,7 @@ class SaleOrder(SQLModel, table=True):
     packaging_fee: float = Field(default=0)
     total: float
 
-    status: Literal["pending", "completed", "cancelled"] = "completed"
+    status: SaleOrderStatus = Field(default=SaleOrderStatus.COMPLETED)
     notes: str | None = None
     created_at: datetime | None = Field(default=None)
 
@@ -183,9 +219,9 @@ class StockMovement(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     inventory_item_id: int = Field(foreign_key="inventory_item.id")
 
-    movement_type: Literal["in", "out"]
+    movement_type: StockMovementType
     quantity: int = Field(gt=0)
-    reference_type: Literal["purchase", "sale", "adjustment", "waste", "production"]
+    reference_type: StockReferenceType
     reference_id: int | None = None
     notes: str | None = None
     created_at: datetime = Field(default=None)
