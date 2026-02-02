@@ -189,3 +189,16 @@ class StockMovement(SQLModel, table=True):
     reference_id: int | None = None
     notes: str | None = None
     created_at: datetime = Field(default=None)
+
+
+# ============= API MODELS =================
+
+
+class InventoryItemBase(SQLModel):
+    variant_name: str
+    current_stock: int
+    unit_price: int
+
+
+class InventoryResponse(InventoryItemBase):
+    id: int

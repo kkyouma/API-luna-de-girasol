@@ -1,229 +1,34 @@
 import logging
-from typing import Literal
 
-from backend import (
-    _get_all_flowers,
-    _get_all_movements,
-    _get_all_occasions,
-    _get_order_details,
-    _get_order_items,
-    _get_pending_orders,
-    create_inventory_transaction,
-    create_order_transaction,
-)
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from backend import get_all_inventory
+from database import get_session
+from fastapi import Depends, FastAPI
+from models import InventoryResponse
+from sqlmodel import Session
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Floristeria API Turso")
-
-# ========== MODELS ============
+app = FastAPI(title="Luna de Girasol API")
 
 
-class OrderItem(BaseModel):
-    flower_id: int
-    quantity: int
-    unit_price: float
-
-
-class OrderResponse(BaseModel):
-    id: int
-    order_date: int
-    total: float
-    notes: str
-    status: str = "pending"
-
-
-class CreateOrderRequest(BaseModel):
-    customer_id: int
-    occasion_id: int
-    items: list[OrderItem]
-    notes: str = ""
-
-
-class OrderMovement(BaseModel):
-    items: list[OrderItem]
-    movement_type: Literal["in", "out"]
-    reference_id: int | None
-    reference_type: Literal["purchase", "adjustment", "waste"]
-    notes: str = ""
-
-
-# ========== ENDPOINTS ============
-
-
-@app.get("/")
-def root():
-    return {"message": "Floristeria API v1.0", "status": "active"}
-
-
-@app.get("/orders/pending", response_model=list[OrderResponse])
-def get_pending_orders():
-    rows = _get_pending_orders()
-    return [
-        {
-            "id": row[0],
-            "order_date": row[0],
-            "total": row[2],
-            "notes": row[3] or "",
-            "status": "pending",
-        }
-        for row in rows
-    ]
-
-
-@app.get("/orders/{order_id}/items")
-def get_order_items(order_id: int):
-    items = _get_order_items(order_id)
-    return [
-        {
-            "flower_id": item[0],
-            "name": item[1],
-            "color": item[2],
-            "quantity": item[3],
-        }
-        for item in items
-    ]
-
-
-@app.get("/orders/{order_id}")
-def get_order_details(order_id: int):
-    order = _get_order_details(order_id)
-    items = _get_order_items(order_id)
+@app.get("/", tags=["Health"])
+def root() -> dict[str, str]:
+    """Health check endpoint."""
     return {
-        "id": order[0],
-        "customer_id": order[1],
-        "order_date": order[2],
-        "subtotal": order[3],
-        "total": order[4],
-        "status": order[5],
-        "notes": order[6] or "",
-        "items": [
-            {
-                "flower_id": item[0],
-                "name": item[1],
-                "color": item[2],
-                "quantity": item[3],
-            }
-            for item in items
-        ],
+        "message": "Luna de Girasol API",
+        "status": "active",
     }
 
 
-@app.get("/flowers/history")
-def get_flowers_history(order_id: int):
-    items = _get_order_items(order_id)
+@app.get("/inventory", response_model=list[InventoryResponse], tags=["Inventory"])
+def get_inventory(session: Session = Depends(get_session)):
+    inventory = get_all_inventory(session)
     return [
-        {
-            "flower_id": item[0],
-            "name": item[1],
-            "color": item[2],
-            "quantity": item[3],
-        }
-        for item in items
-    ]
-
-
-@app.post("/orders")
-def create_order(order_data: CreateOrderRequest):
-    """Crea una nueva orden"""
-    try:
-        items_dict = [
-            {
-                "flower_id": item.flower_id,
-                "quantity": item.quantity,
-                "unit_price": item.unit_price,
-            }
-            for item in order_data.items
-        ]
-
-        order_id = create_order_transaction(
-            customer_id=order_data.customer_id,
-            occasion_id=order_data.occasion_id,
-            items=items_dict,
-            notes=order_data.notes,
+        InventoryResponse(
+            id=i.id,
+            variant_name=i.variant_name,
+            current_stock=i.current_stock,
+            unit_price=i.unit_price,
         )
-
-        return {"order_id": order_id, "message": "Orden creada exitosamente"}
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error creating order: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/flowers")
-def get_all_flowers():
-    rows = _get_all_flowers()
-    return [
-        {
-            "id": row[0],
-            "name": row[1],
-            "color": row[2],
-            "current_stock": row[3],
-            "price": row[4],
-        }
-        for row in rows
+        for i in inventory
     ]
-
-
-@app.post("/flowers/movements")
-def create_stock_movement(movement: OrderMovement):
-    try:
-        items_dict = [
-            {
-                "flower_id": item.flower_id,
-                "quantity": item.quantity,
-            }
-            for item in movement.items
-        ]
-        create_inventory_transaction(
-            items=items_dict,
-            movement_type=movement.movement_type,
-            reference_id=movement.reference_id,
-            reference_type=movement.reference_type,
-            notes=movement.notes,
-        )
-        return {"message": "Movimiento creado exitosamente"}
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error creando movimiento: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/flowers/movements/history")
-def get_all_movements(limit: int = 10):
-    rows = _get_all_movements(limit)
-    return [
-        {
-            "id": row[0],
-            "flower_id": row[1],
-            "movement_type": row[2],
-            "quantity": row[3],
-            "reference_type": row[4],
-            "reference_id": row[5],
-            "notes": row[6],
-            "created_at": row[7],
-        }
-        for row in rows
-    ]
-
-
-@app.get("/occasions")
-def get_all_occasions():
-    rows = _get_all_occasions()
-    return [{"id": row[0], "name": row[1], "description": row[2]} for row in rows]
-
-
-# @app.get("/orders", response_model=list[OrderResponse])
-# async def create_item(item: OrderItem):
-#     return {
-#         "item": item,
-#         "quantity": item.quantity,
-#         "unit_price": item.unit_price,
-#         "message": "Item created",
-#     }
