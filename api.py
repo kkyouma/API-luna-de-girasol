@@ -40,14 +40,15 @@ def get_inventory(session: Session = Depends(get_session)) -> list[InventoryItem
     ]
 
 
-@app.post("/catalog", response_model=ProductCatalogRead)
+@app.post("/catalog", response_model=ProductCatalogRead, tags=["Catalog"])
 def add_catalog(
     product: ProductCatalogCreate,
     session: Session = Depends(get_session),
 ):
-    product = ProductCatalog.model_validate(product)
-    session.add(product)
+    """Add a product to the catalog."""
+    db_product = ProductCatalog.model_validate(product)
+    session.add(db_product)
     session.commit()
-    session.refresh(product)
+    session.refresh(db_product)
     logger.info(f"Added {product.name} to catalog")
-    return product
+    return db_product
