@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -51,7 +51,7 @@ class ProductCatalog(ProductCatalogBase, table=True):
     __tablename__ = "product_catalog"
 
     id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
     inventory_items: list["InventoryItem"] = Relationship(back_populates="product")
 
@@ -89,8 +89,8 @@ class InventoryItem(InventoryItemBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="product_catalog.id")
     sku: str | None = Field(default=None, unique=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
+    updated_at: datetime | None = Field(default=None)
 
     product: ProductCatalog = Relationship(back_populates="inventory_items")
 
@@ -135,7 +135,7 @@ class Supplier(SupplierBase, table=True):
     __tablename__ = "supplier"
 
     id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
     purchase_orders: list["PurchaseOrder"] = Relationship(back_populates="supplier")
 
@@ -176,7 +176,7 @@ class PurchaseOrder(PurchaseOrderBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     supplier_id: int = Field(foreign_key="supplier.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
     supplier: Supplier = Relationship(back_populates="purchase_orders")
     items: list["PurchaseOrderItem"] = Relationship(back_populates="purchase_order")
@@ -245,7 +245,7 @@ class Customer(CustomerBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     total_purchases: int = Field(default=0)
     total_spent: float = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
 
 class CustomerCreate(CustomerBase):
@@ -308,7 +308,7 @@ class BouquetTemplate(BouquetTemplateBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     occasion_id: int | None = Field(foreign_key="occasion.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
     items: list["BouquetTemplateItem"] = Relationship(back_populates="bouquet")
 
@@ -376,7 +376,7 @@ class SaleOrder(SaleOrderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     customer_id: int | None = Field(foreign_key="customer.id")
     occasion_id: int | None = Field(foreign_key="occasion.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
     items: list["SaleOrderItem"] = Relationship(back_populates="sale_order")
 
@@ -447,7 +447,7 @@ class StockMovement(StockMovementBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     inventory_item_id: int = Field(foreign_key="inventory_item.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = Field(default=None)
 
 
 class StockMovementCreate(StockMovementBase):
