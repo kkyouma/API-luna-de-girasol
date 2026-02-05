@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -51,7 +51,9 @@ class ProductCatalog(ProductCatalogBase, table=True):
     __tablename__ = "product_catalog"
 
     id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime | None = Field(default=datetime.now(UTC))
+    created_at: datetime | None = Field(
+        default=None, sa_column_kwargs={"server_default": "current_timestamp"}
+    )
 
     inventory_items: list["InventoryItem"] = Relationship(back_populates="product")
 
@@ -90,10 +92,12 @@ class InventoryItem(InventoryItemBase, table=True):
     product_id: int = Field(foreign_key="product_catalog.id")
     sku: str | None = Field(default=None, unique=True)
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
     updated_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
     product: ProductCatalog = Relationship(back_populates="inventory_items")
@@ -140,7 +144,8 @@ class Supplier(SupplierBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
     purchase_orders: list["PurchaseOrder"] = Relationship(back_populates="supplier")
@@ -183,7 +188,8 @@ class PurchaseOrder(PurchaseOrderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     supplier_id: int = Field(foreign_key="supplier.id")
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
     supplier: Supplier = Relationship(back_populates="purchase_orders")
@@ -254,7 +260,8 @@ class Customer(CustomerBase, table=True):
     total_purchases: int = Field(default=0)
     total_spent: float = Field(default=0)
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
 
@@ -319,7 +326,8 @@ class BouquetTemplate(BouquetTemplateBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     occasion_id: int | None = Field(foreign_key="occasion.id")
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
     items: list["BouquetTemplateItem"] = Relationship(back_populates="bouquet")
@@ -389,7 +397,8 @@ class SaleOrder(SaleOrderBase, table=True):
     customer_id: int | None = Field(foreign_key="customer.id")
     occasion_id: int | None = Field(foreign_key="occasion.id")
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
     items: list["SaleOrderItem"] = Relationship(back_populates="sale_order")
@@ -462,7 +471,8 @@ class StockMovement(StockMovementBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     inventory_item_id: int = Field(foreign_key="inventory_item.id")
     created_at: datetime | None = Field(
-        default=lambda: datetime.now(UTC).replace(microsecond=0),
+        default=None,
+        sa_column_kwargs={"server_default": "current_timestamp"},
     )
 
 
