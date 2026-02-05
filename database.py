@@ -37,7 +37,7 @@ engine = create_engine(
 )
 
 
-def get_session():  # noqa: ANN201
+def get_session():
     with Session(engine) as session:
         yield session
 
@@ -56,7 +56,7 @@ def get_session_context():
 
 
 @contextmanager
-def transaction_context(session: Session):  # noqa: ANN201
+def transaction_context(session: Session):
     try:
         yield session
         session.commit()

@@ -2,17 +2,16 @@ import logging
 
 from models import (
     InventoryItem,
-    InventoryItemRead,
 )
-from sqlmodel import Sequence, Session, select
+from sqlmodel import Session, select
 
 logger = logging.getLogger(__name__)
 
 
-def get_all_inventory(session: Session) -> Sequence[InventoryItemRead]:
+def get_all_inventory(session: Session) -> list[InventoryItem]:
     """Get all the inventory items."""
     statement = select(InventoryItem).order_by(InventoryItem.variant_name)
-    items = session.exec(statement).all()
+    items = list(session.exec(statement).all())
     logger.debug(f"Get {len(items)} items from the inventory")
     return items
 
