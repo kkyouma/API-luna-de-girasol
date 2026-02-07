@@ -212,33 +212,28 @@ def get_sales(session: Session = Depends(get_session)):
 
 @app.post("/sales", response_model=SaleOrderReadWithDetails, tags=["Sales"])
 def create_sale_order(
-    order: SaleOrderCreate,
+    sale_order: SaleOrderCreate,
     session: Session = Depends(get_session),
 ) -> SaleOrderReadWithDetails:
-    db_sale = SaleOrder.model_validate(order)
+
+    sale_dict = sale_order.model_dump(exclude={"items"})
+    db_sale = SaleOrder.model_validate(sale_dict)
+
+    db_sale.subtotal = 0
+    db_sale.total = 0
+
     session.add(db_sale)
     session.flush()
 
     running_subtotal = 0.0
 
-    for item_data in order.items:
-        db_item = SaleOrderItem(
-            sale_order_id=db_sale.id,
-            quantity=item_data.quantity,
-            unit_price=item_data.unit_price,
-            subtotal=item_data.quantity * item_data.unit_price,
-            description=item_data.description,
-            inventory_item_id=item_data.inventory_item_id,
-            bouquet_template_id=item_data.bouquet_template_id,
-        )
-        session.add(db_item)
-        running_subtotal += db_item.subtotal
-
+    for item_data in db_sale.items:
         # STOCK DEDUCTION
         inventory_item = session.get(InventoryItem, item_data.inventory_item_id)
         if not inventory_item:
             raise HTTPException(
-                status_code=404, detail=f"Item {item_data.inventory_item_id} not found"
+                status_code=404,
+                detail=f"Item {item_data.inventory_item_id} not found",
             )
 
         if inventory_item.current_stock < item_data.quantity:
@@ -257,13 +252,31 @@ def create_sale_order(
             quantity=item_data.quantity,
             reference_type=StockReferenceType.SALE,
             reference_id=db_sale.id,
+            inventory_item_id=inventory_item.id,
+            notes=f"Sale #{db_sale.id}",
         )
-        # TODO: Add movement to session (session.add(movement))
-        # TODO: Set inventory_item_id in StockMovement to link to specific item
+        session.add(movement)
 
-    # TODO: Update db_sale with calculated totals (subtotal, tax_amount, total_amount)
-    # TODO: Implement bouquet template expansion logic if needed
+        db_item = SaleOrderItem(
+            sale_order_id=db_sale.id,
+            quantity=item_data.quantity,
+            unit_price=item_data.unit_price,
+            subtotal=item_data.quantity * item_data.unit_price,
+            description=item_data.description,
+            inventory_item_id=item_data.inventory_item_id,
+            bouquet_template_id=item_data.bouquet_template_id,
+        )
+        session.add(db_item)
+        running_subtotal += db_item.subtotal
 
+    db_sale.subtotal = running_subtotal
+    discount_val = (
+        running_subtotal * (db_sale.discount_percent / 100) + db_sale.discount_amount
+    )
+    db_sale.total = max(0, running_subtotal - discount_val + db_sale.packaging_fee)
+
+    session.add(db_sale)
     session.commit()
     session.refresh(db_sale)
+
     return db_sale  # ty:ignore[invalid-return-type]
