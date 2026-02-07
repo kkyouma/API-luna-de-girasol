@@ -211,72 +211,143 @@ def get_sales(session: Session = Depends(get_session)):
 
 
 @app.post("/sales", response_model=SaleOrderReadWithDetails, tags=["Sales"])
-def create_sale_order(
-    sale_order: SaleOrderCreate,
+def create_sale(
+    sale_order_data: SaleOrderCreate,
     session: Session = Depends(get_session),
-) -> SaleOrderReadWithDetails:
+) -> SaleOrder:
+    """Create a new sale."""
+    logger.info("START create_sale")
+    logger.debug("Incoming payload: %s", sale_order_data.model_dump())
 
-    sale_dict = sale_order.model_dump(exclude={"items"})
-    db_sale = SaleOrder.model_validate(sale_dict)
-
-    db_sale.subtotal = 0
-    db_sale.total = 0
+    # 1. Prepare the Sale Order object
+    logger.info("Creating SaleOrder DB object")
+    db_sale = SaleOrder(
+        order_date=sale_order_data.order_date,
+        order_type=sale_order_data.order_type.value,
+        customer_id=sale_order_data.customer_id,
+        occasion_id=sale_order_data.occasion_id,
+        subtotal=0,
+        total=0,
+        status=sale_order_data.status.value,
+        notes=sale_order_data.notes,
+    )
 
     session.add(db_sale)
     session.flush()
+    logger.debug("SaleOrder flushed with ID=%s", db_sale.id)
 
     running_subtotal = 0.0
 
-    for item_data in db_sale.items:
-        # STOCK DEDUCTION
+    # 2. Process each item
+    for idx, item_data in enumerate(sale_order_data.items, start=1):
+        logger.info("Processing item #%d", idx)
+        logger.debug("Item payload: %s", item_data.model_dump())
+
+        # Validation
+        if item_data.inventory_item_id and item_data.bouquet_template_id:
+            logger.error("Item has both inventory and bouquet IDs: %s", item_data)
+            raise HTTPException(400, "Item cannot be both inventory and bouquet")
+
+        if not item_data.inventory_item_id and not item_data.bouquet_template_id:
+            logger.error("Item has no inventory or bouquet ID: %s", item_data)
+            raise HTTPException(400, "Item must target inventory or bouquet")
+
         inventory_item = session.get(InventoryItem, item_data.inventory_item_id)
         if not inventory_item:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Item {item_data.inventory_item_id} not found",
-            )
+            logger.error("Inventory item not found: id=%s", item_data.inventory_item_id)
+            raise HTTPException(404, f"Item {item_data.inventory_item_id} not found")
 
-        if inventory_item.current_stock < item_data.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient stock for item {item_data.inventory_item_id}",
-            )
-
-        # Deduct Stock
-        inventory_item.current_stock -= item_data.quantity
-        session.add(inventory_item)
-
-        # Log movement
-        movement = StockMovement(
-            movement_type=StockMovementType.OUT,
-            quantity=item_data.quantity,
-            reference_type=StockReferenceType.SALE,
-            reference_id=db_sale.id,
-            inventory_item_id=inventory_item.id,
-            notes=f"Sale #{db_sale.id}",
+        unit_price = (
+            item_data.unit_price
+            if hasattr(item_data, "unit_price_override")
+            and item_data.unit_price_override is not None
+            else inventory_item.unit_price
         )
-        session.add(movement)
 
+        # Create SaleOrderItem
         db_item = SaleOrderItem(
             sale_order_id=db_sale.id,
             quantity=item_data.quantity,
-            unit_price=item_data.unit_price,
-            subtotal=item_data.quantity * item_data.unit_price,
+            unit_price=unit_price,
+            subtotal=item_data.quantity * unit_price,
             description=item_data.description,
             inventory_item_id=item_data.inventory_item_id,
             bouquet_template_id=item_data.bouquet_template_id,
         )
+
         session.add(db_item)
         running_subtotal += db_item.subtotal
+        logger.debug(
+            "Added SaleOrderItem: inventory_id=%s qty=%s subtotal=%s running_subtotal=%s",
+            item_data.inventory_item_id,
+            item_data.quantity,
+            db_item.subtotal,
+            running_subtotal,
+        )
 
+        logger.debug(
+            "Stock before deduction: item=%s stock=%s",
+            inventory_item.id,
+            inventory_item.current_stock,
+        )
+
+        if inventory_item.current_stock < item_data.quantity:
+            logger.warning(
+                "Insufficient stock: item=%s required=%s available=%s",
+                inventory_item.id,
+                item_data.quantity,
+                inventory_item.current_stock,
+            )
+            raise HTTPException(
+                400,
+                f"Insufficient stock for '{inventory_item.variant_name}'. "
+                f"Required: {item_data.quantity}, Available: {inventory_item.current_stock}",
+            )
+
+        # === STOCK DEDUCTION ===
+        # Deduct stock
+        inventory_item.current_stock -= item_data.quantity
+        session.add(inventory_item)
+        logger.debug(
+            "Stock deducted: item=%s new_stock=%s",
+            inventory_item.id,
+            inventory_item.current_stock,
+        )
+
+        # Stock movement
+        movement = StockMovement(
+            movement_type=StockMovementType.OUT.value,
+            quantity=item_data.quantity,
+            reference_type=StockReferenceType.SALE.value,
+            reference_id=db_sale.id,
+            inventory_item_id=inventory_item.id,
+            notes=f"Sale #{db_sale.id} (Direct)",
+        )
+        session.add(movement)
+        logger.debug("StockMovement created: %s", movement)
+
+    # 3. Finalize totals
     db_sale.subtotal = running_subtotal
     discount_val = (
-        running_subtotal * (db_sale.discount_percent / 100) + db_sale.discount_amount
-    )
-    db_sale.total = max(0, running_subtotal - discount_val + db_sale.packaging_fee)
+        running_subtotal * (sale_order_data.discount_percent / 100)
+    ) + sale_order_data.discount_amount
 
-    session.add(db_sale)
+    db_sale.total = running_subtotal - discount_val + sale_order_data.packaging_fee
+
+    logger.info(
+        "Totals calculated: subtotal=%s discount=%s packaging=%s total=%s",
+        running_subtotal,
+        discount_val,
+        sale_order_data.packaging_fee,
+        db_sale.total,
+    )
+
+    # 4. Commit
+    logger.info("Committing transaction for sale_id=%s", db_sale.id)
+    logger.info(f"SALE:\n{db_sale.model_dump_json()}")
+    logger.info(f"MOVEMENT:\n{movement.model_dump_json()}")
     session.commit()
     session.refresh(db_sale)
 
-    return db_sale  # ty:ignore[invalid-return-type]
+    logger.info("END create_sale sale_id=%s", db_sale.id)
+    return db_sale

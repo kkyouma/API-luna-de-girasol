@@ -144,8 +144,7 @@ class Supplier(SupplierBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime | None = Field(
-        default=None,
-        sa_column_kwargs={"server_default": "current_timestamp"},
+        default=None, sa_column_kwargs={"server_default": "current_timestamp"}
     )
 
     purchase_orders: list["PurchaseOrder"] = Relationship(back_populates="supplier")
@@ -188,8 +187,7 @@ class PurchaseOrder(PurchaseOrderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     supplier_id: int = Field(foreign_key="supplier.id")
     created_at: datetime | None = Field(
-        default=None,
-        sa_column_kwargs={"server_default": "current_timestamp"},
+        default=None, sa_column_kwargs={"server_default": "current_timestamp"}
     )
 
     supplier: Supplier = Relationship(back_populates="purchase_orders")
@@ -260,8 +258,7 @@ class Customer(CustomerBase, table=True):
     total_purchases: int = Field(default=0)
     total_spent: float = Field(default=0)
     created_at: datetime | None = Field(
-        default=None,
-        sa_column_kwargs={"server_default": "current_timestamp"},
+        default=None, sa_column_kwargs={"server_default": "current_timestamp"}
     )
 
 
@@ -326,8 +323,7 @@ class BouquetTemplate(BouquetTemplateBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     occasion_id: int | None = Field(foreign_key="occasion.id")
     created_at: datetime | None = Field(
-        default=None,
-        sa_column_kwargs={"server_default": "current_timestamp"},
+        default=None, sa_column_kwargs={"server_default": "current_timestamp"}
     )
 
     items: list["BouquetTemplateItem"] = Relationship(back_populates="bouquet")
@@ -380,13 +376,13 @@ class BouquetTemplateItemRead(BouquetTemplateItemBase):
 
 class SaleOrderBase(SQLModel):
     order_date: datetime
-    order_type: SaleOrderType = SaleOrderType.WALK_IN
+    order_type: str = SaleOrderType.WALK_IN.value
     subtotal: float
     discount_percent: float = 0
     discount_amount: float = 0
     packaging_fee: float = 0
     total: float
-    status: SaleOrderStatus = SaleOrderStatus.COMPLETED
+    status: str = SaleOrderStatus.COMPLETED.value
     notes: str | None = None
 
 
@@ -405,6 +401,8 @@ class SaleOrder(SaleOrderBase, table=True):
 
 
 class SaleOrderCreate(SaleOrderBase):
+    order_type: SaleOrderType = SaleOrderType.WALK_IN
+    status: SaleOrderStatus = SaleOrderStatus.COMPLETED
     customer_id: int | None = None
     occasion_id: int | None = None
     items: list["SaleOrderItemCreate"] = []
@@ -426,8 +424,8 @@ class SaleOrderReadWithDetails(SaleOrderRead):
 
 class SaleOrderItemBase(SQLModel):
     quantity: int
-    unit_price: float = Field(ge=0)
-    subtotal: float
+    unit_price: float | None = Field(default=None, ge=0)
+    subtotal: float | None = None
     description: str | None = None
 
 
@@ -458,9 +456,9 @@ class SaleOrderItemRead(SaleOrderItemBase):
 
 
 class StockMovementBase(SQLModel):
-    movement_type: StockMovementType
+    movement_type: str = StockMovementType.IN.value
     quantity: int = Field(gt=0)
-    reference_type: StockReferenceType
+    reference_type: str = StockReferenceType.SALE.value
     reference_id: int | None = None
     notes: str | None = None
 
@@ -477,6 +475,8 @@ class StockMovement(StockMovementBase, table=True):
 
 
 class StockMovementCreate(StockMovementBase):
+    movement_type: StockMovementType = StockMovementType.IN
+    reference_type: StockReferenceType = StockReferenceType.SALE
     inventory_item_id: int
 
 
