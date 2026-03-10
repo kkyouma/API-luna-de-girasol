@@ -9,6 +9,9 @@ wheels/
 .streamlit/secrets.toml
 schema.sql
 
+.ruff_cache
+.pytest_cache
+
 # Virtual environments
 .venv
 
