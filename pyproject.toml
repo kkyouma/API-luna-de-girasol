@@ -61,6 +61,7 @@ ignore = [
   "D104",   # Missing docstring in public package
   "D105",   # Missing docstring in public module
   "D400",   # First line should end with a period
+  "COM812", # Trailing comma — conflicts with ruff formatter
   "ANN001", # Missing type annotation for function argument
   "ANN002", # Missing type annotation for *args
   "ANN003", # Missing type annotation for **kwargs
