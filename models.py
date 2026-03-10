@@ -194,8 +194,12 @@ class PurchaseOrder(PurchaseOrderBase, table=True):
     items: list["PurchaseOrderItem"] = Relationship(back_populates="purchase_order")
 
 
-class PurchaseOrderCreate(PurchaseOrderBase):
+class PurchaseOrderCreate(SQLModel):
+    """Input for creating a purchase order. Server calculates total_cost."""
+
     supplier_id: int
+    delivery_date: datetime | None = None
+    notes: str | None = None
     items: list["PurchaseOrderItemCreate"] = []
 
 
@@ -229,14 +233,26 @@ class PurchaseOrderItem(PurchaseOrderItemBase, table=True):
     purchase_order: PurchaseOrder = Relationship(back_populates="items")
 
 
-class PurchaseOrderItemCreate(PurchaseOrderItemBase):
+class PurchaseOrderItemCreate(SQLModel):
+    """Input for a purchase order line item. Server calculates subtotal."""
+
     inventory_item_id: int
+    quantity: int
+    unit_cost: float
 
 
 class PurchaseOrderItemRead(PurchaseOrderItemBase):
     id: int
     purchase_order_id: int
     inventory_item_id: int
+
+
+class PurchaseOrderUpdate(SQLModel):
+    """Input for updating a purchase order."""
+
+    delivery_date: datetime | None = None
+    status: PurchaseOrderStatus | None = None
+    notes: str | None = None
 
 
 # =============== CUSTOMER ================
@@ -400,11 +416,17 @@ class SaleOrder(SaleOrderBase, table=True):
     items: list["SaleOrderItem"] = Relationship(back_populates="sale_order")
 
 
-class SaleOrderCreate(SaleOrderBase):
+class SaleOrderCreate(SQLModel):
+    """Input for creating a sale. Server calculates subtotal and total."""
+
     order_type: SaleOrderType = SaleOrderType.WALK_IN
     status: SaleOrderStatus = SaleOrderStatus.COMPLETED
     customer_id: int | None = None
     occasion_id: int | None = None
+    discount_percent: float = 0
+    discount_amount: float = 0
+    packaging_fee: float = 0
+    notes: str | None = None
     items: list["SaleOrderItemCreate"] = []
 
 
@@ -440,9 +462,14 @@ class SaleOrderItem(SaleOrderItemBase, table=True):
     sale_order: SaleOrder = Relationship(back_populates="items")
 
 
-class SaleOrderItemCreate(SaleOrderItemBase):
+class SaleOrderItemCreate(SQLModel):
+    """Input for a sale line item. Server calculates subtotal."""
+
     inventory_item_id: int | None = None
     bouquet_template_id: int | None = None
+    quantity: int
+    unit_price: float | None = Field(default=None, ge=0)
+    description: str | None = None
 
 
 class SaleOrderItemRead(SaleOrderItemBase):
